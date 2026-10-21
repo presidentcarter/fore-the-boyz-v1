@@ -159,6 +159,15 @@ img{max-width:100%}
 .gateErr{font-size:13px;color:#FFD9A0;min-height:1.2em}
 .checked{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px}
 .checked b{font-family:var(--body)}
+.payOpts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.payBtn{display:flex;flex-direction:column;gap:3px;padding:12px;border-radius:8px;text-decoration:none;min-width:0}
+.payBtn b{font-size:15px}
+.payBtn small{font-size:12px;opacity:.85;overflow-wrap:anywhere}
+.zelle .phone{display:block;font-size:13px;font-weight:700}
+.venmo{background:#008CFF;color:#fff}
+.zelle{border:1px solid #8A4FE0;color:var(--ink);background:color-mix(in srgb,#6D1ED4 10%,transparent)}
+.zcopy{margin-top:6px;align-self:flex-start;padding:6px 10px;border-radius:6px;border:1px solid #8A4FE0;background:transparent;color:inherit;font-weight:700;font-size:12px}
+@media (max-width:360px){.payOpts{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -214,8 +223,11 @@ img{max-width:100%}
       <div class="eyebrow">You owe</div>
       <div class="amt num" id="myOwe">$0</div>
       <div class="foot" id="myTeams"></div>
-      <div class="btnRow"><a class="btn" id="payLink" href="#">Pay with Apple Cash</a><button class="btn ghost" id="copyPhone">Copy number</button></div>
-      <div class="foot">Opens Messages to <span class="phone" id="phoneTxt">—</span> with the amount filled in. Tap the Apple Cash button in Messages to send. If nothing opens, copy the number instead.</div>
+      <div class="payOpts">
+        <a class="payBtn venmo" id="venmoLink" href="#" target="_blank" rel="noopener"><b>Pay on Venmo</b><small id="venmoTxt">—</small></a>
+        <div class="payBtn zelle" id="zelleBox"><b>Pay with Zelle</b><small>Send to <span class="phone" id="phoneTxt">—</span></small><button class="zcopy" id="copyPhone">Copy Zelle info</button></div>
+      </div>
+      <div class="foot">Venmo opens with the treasurer, amount and note filled in, so you just tap Pay. Zelle works inside your bank's app: copy the treasurer's Zelle info and paste it there.</div>
     </div>
     <div class="lb"><div class="board" id="ledger"></div></div>
   </section>
@@ -238,9 +250,11 @@ img{max-width:100%}
       <button class="btn ghost" id="aClose">Sell now</button>
       <button class="btn ghost" id="aPass">Pass (no sale)</button>
     </div>
+    <p class="foot" id="aMsg" role="status"></p>
     <div class="grid">
       <label>Treasurer name<input id="sTName"></label>
-      <label>Treasurer phone<input id="sTPhone" inputmode="tel"></label>
+      <label>Treasurer Venmo username<input id="sVenmo" autocapitalize="none" autocorrect="off" placeholder="@username"></label>
+      <label>Treasurer Zelle phone or email<input id="sTPhone" autocapitalize="none" autocorrect="off"></label>
       <label>Clock (seconds)<input id="sTimer" inputmode="numeric"></label>
       <label>Opening bid ($)<input id="sOpen" inputmode="numeric"></label>
       <label>Min raise ($)<input id="sInc" inputmode="numeric"></label>
@@ -293,7 +307,7 @@ const TEAMS=[
   name:[t[0],t[2]].map(n=>{const w=n.split(" ");return w[0]+" "+w[w.length-1][0]+"."}).join(" & ")}});
 const TRO="<svg class=\"tro\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V17h3v2H8v-2h3v-2.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3V3Zm0 4H6v1a2 2 0 0 0 1.2 1.8A5 5 0 0 1 7 8.6V7Zm10 0v1.6c0 .4 0 .8-.2 1.2A2 2 0 0 0 18 8V7h-1ZM6 20h12v2H6v-2Z\"/></svg>";
 const BY=Object.fromEntries(TEAMS.map(t=>[t.id,t]));
-const DEF={tName:"Treasurer",tPhone:"",timer:60,open:1,inc:1,ext:10,split:[50,25,15,10],order:TEAMS.map(t=>t.id)};
+const DEF={tName:"Treasurer",tPhone:"",venmo:"",timer:60,open:1,inc:1,ext:10,split:[50,25,15,10],order:TEAMS.map(t=>t.id)};
 
 const $=id=>document.getElementById(id);
 const money=n=>"$"+Math.round(n).toLocaleString();
@@ -355,8 +369,10 @@ function renderBoard(){
     return `<div class="row${now?" now":""}${t.champ?" champ":""}"><div class="pos">${i+1}</div><div style="min-width:0"><div class="tname">${t.champ?TRO:""}${esc(t.p1)} &amp; ${esc(t.p2)}</div>${t.champ?`<div class="champTag">2026 FTB Champions</div>`:""}<div class="tmeta num">${t.h1.toFixed(1)} + ${t.h2.toFixed(1)}${s?" · owner "+esc(s.alias||"Someone"):""}</div></div><div class="right"><span class="odds num">${t.team.toFixed(1)}</span>${chip}${arrows}</div></div>`}).join("");
 }
 function renderLedger(){
-  $("treasName").textContent=S.tName+(S.tPhone?" · "+S.tPhone:"");
-  $("phoneTxt").textContent=S.tPhone||"(number not set)";
+  $("treasName").textContent=S.tName+(S.venmo?" · Venmo @"+S.venmo:"");
+  $("phoneTxt").textContent=S.tPhone||"(not set)";
+  $("venmoTxt").textContent=S.venmo?"to @"+S.venmo:"Venmo not set";
+  $("venmoLink").hidden=!S.venmo;$("zelleBox").hidden=!S.tPhone;
   const list=Object.entries(sales).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
   $("ledger").innerHTML=list.length?list.map(([id,s])=>{const t=BY[id];
     const pay=isAdmin?`<button class="mini" data-paid="${id}">${s.paid?"Paid ✓":"Mark paid"}</button>`:`<span class="${s.paid?"paid":"unpaid"}">${s.paid?"Paid":"Owes"}</span>`;
@@ -367,11 +383,11 @@ function renderLedger(){
   $("myPay").hidden=!owe;
   if(owe){$("myOwe").textContent=money(owe);$("myTeams").textContent=mine.map(([id])=>BY[id]?.name).join(", ");
     const body=encodeURIComponent(`FTB Calcutta: ${money(owe)} for ${mine.map(([id])=>BY[id]?.name).join(", ")}`);
-    $("payLink").href=S.tPhone?`sms:${S.tPhone.replace(/[^\d+]/g,"")}&body=${body}`:"#";}
+    $("venmoLink").href=S.venmo?`https://venmo.com/?txn=pay&audience=private&recipients=${encodeURIComponent(S.venmo)}&amount=${owe}&note=${body}`:"#";}
 }
 function renderAdmin(){
   $("admin").hidden=!isAdmin;$("signin").hidden=isAdmin||!db;if(!isAdmin)return;
-  const f={sTName:S.tName,sTPhone:S.tPhone,sTimer:S.timer,sOpen:S.open,sInc:S.inc,sExt:S.ext,sSplit:S.split.join("/")};
+  const f={sTName:S.tName,sVenmo:S.venmo?"@"+S.venmo:"",sTPhone:S.tPhone,sTimer:S.timer,sOpen:S.open,sInc:S.inc,sExt:S.ext,sSplit:S.split.join("/")};
   for(const k in f)if(document.activeElement!==$(k))$(k).value=f[k];
   $("aPause").textContent=state.status==="paused"?"Resume":"Pause";
 }
@@ -394,7 +410,7 @@ async function placeBid(amount){
 ["bidMin","bidR5","bidR10","bidR25"].forEach(id=>$(id).addEventListener("click",e=>placeBid(e.currentTarget.dataset.a)));
 $("bidCustom").addEventListener("click",()=>placeBid($("customIn").value.replace(/[^\d]/g,"")));
 $("customIn").addEventListener("keydown",e=>{if(e.key==="Enter")$("bidCustom").click()});
-$("copyPhone").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(S.tPhone);$("copyPhone").textContent="Copied"}catch(e){const r=document.createRange();r.selectNodeContents($("phoneTxt"));const sel=getSelection();sel.removeAllRanges();sel.addRange(r)}});
+$("copyPhone").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(S.tPhone);$("copyPhone").textContent="Copied ✓"}catch(e){const r=document.createRange();r.selectNodeContents($("phoneTxt"));const sel=getSelection();sel.removeAllRanges();sel.addRange(r)}});
 
 function checkIn(name){
   name=name.trim().slice(0,24);if(!name)return false;
@@ -405,8 +421,9 @@ function checkIn(name){
 $("gateForm").addEventListener("submit",e=>{e.preventDefault();if(checkIn($("gateName").value))$("gate").hidden=true;else $("gateErr").textContent="Enter your name to check in."});
 $("aliasIn").addEventListener("change",e=>checkIn(e.target.value));
 
-const setState=d=>ref("state").set(d);
-const saveCfg=()=>ref("config").set(S);
+function adminErr(e){const m=(e&&e.code||e&&e.message||"").toString();$("aMsg").textContent=m.toUpperCase().includes("PERMISSION")?"The database refused that change. In Firebase, open Realtime Database → Rules, paste the auction rules, and tap Publish. Then reload this page.":"That didn't save. Check your signal and try again.";throw e}
+const setState=d=>{$("aMsg").textContent="";return ref("state").set(d).catch(adminErr)};
+const saveCfg=()=>ref("config").set(S).catch(adminErr);
 async function finalize(){
   finalizing=true;
   try{const t=state.teamId,end=effEnd(),h=curBids().filter(b=>(b.at||0)<=end)[0];
@@ -417,7 +434,7 @@ async function finalize(){
 }
 function nextTeam(){return S.order.find(id=>!sales[id]&&!(state.status==="closed"&&id===state.teamId))||S.order.find(id=>!sales[id])}
 function moveToEnd(id){S.order=S.order.filter(x=>x!==id).concat(id);saveCfg()}
-$("aNext").addEventListener("click",()=>{const id=nextTeam();if(!id)return;setState({status:"live",teamId:id,endsAt:now()+S.timer*1000})});
+$("aNext").addEventListener("click",()=>{if(!db){$("aMsg").textContent="Not connected to the database yet. Reload the page.";return}const id=nextTeam();if(!id)return;setState({status:"live",teamId:id,endsAt:now()+S.timer*1000})});
 $("aPause").addEventListener("click",()=>{if(state.status==="live")setState({status:"paused",teamId:state.teamId,remainingMs:remaining()});else if(state.status==="paused")setState({status:"live",teamId:state.teamId,endsAt:now()+(state.remainingMs||0)})});
 $("aAdd").addEventListener("click",()=>{if(state.status==="live")setState({...state,endsAt:effEnd()+15000});else if(state.status==="paused")setState({...state,remainingMs:(state.remainingMs||0)+15000})});
 $("aClose").addEventListener("click",()=>{if(state.status==="live"||state.status==="paused")finalize()});
@@ -425,8 +442,8 @@ $("aPass").addEventListener("click",async()=>{if(!state.teamId||sales[state.team
 $("sSave").addEventListener("click",()=>{
   const sp=$("sSplit").value.split(/[\/,\s]+/).map(Number).filter(n=>!isNaN(n));
   if(sp.length!==4||sp.reduce((a,b)=>a+b,0)!==100){$("sMsg").textContent="Split needs 4 numbers that add up to 100.";return}
-  Object.assign(S,{tName:$("sTName").value.trim()||"Treasurer",tPhone:$("sTPhone").value.trim(),timer:Math.max(10,+$("sTimer").value||60),open:Math.max(1,+$("sOpen").value||1),inc:Math.max(1,+$("sInc").value||1),ext:Math.max(0,+$("sExt").value||0),split:sp});
-  saveCfg().then(()=>$("sMsg").textContent="Saved.",()=>$("sMsg").textContent="Couldn't save. Try again.");
+  Object.assign(S,{tName:$("sTName").value.trim()||"Treasurer",venmo:$("sVenmo").value.trim().replace(/^@/,""),tPhone:$("sTPhone").value.trim(),timer:Math.max(10,+$("sTimer").value||60),open:Math.max(1,+$("sOpen").value||1),inc:Math.max(1,+$("sInc").value||1),ext:Math.max(0,+$("sExt").value||0),split:sp});
+  saveCfg().then(()=>$("sMsg").textContent="Saved.",()=>$("sMsg").textContent="Couldn't save. See the message above.");
 });
 document.addEventListener("click",e=>{
   const b=e.target.closest("button");if(!b||!isAdmin)return;
@@ -461,11 +478,12 @@ try{const a=localStorage.getItem("ftb_alias");if(a)$("aliasIn").value=a;else $("
     me.id=u.uid;isAdmin=!!(u.email&&u.email.toLowerCase()===ADMIN_EMAIL.toLowerCase());
     const a=$("aliasIn").value.trim();if(a)ref("players/"+me.id).update({name:a,at:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
     if(!subscribed){subscribed=true;
-      ref("config").on("value",s=>{S={...DEF,...(s.val()||{})};renderAll()});
-      ref("state").on("value",s=>{state=s.val()||{status:"idle"};renderAll()});
+      const readErr=()=>{$("bannerTxt").textContent="Can't load the auction. The database rules need to be published in Firebase.";};
+      ref("config").on("value",s=>{S={...DEF,...(s.val()||{})};renderAll()},readErr);
+      ref("state").on("value",s=>{state=s.val()||{status:"idle"};renderAll()},readErr);
       ref("bids").on("value",s=>{const v=s.val()||{};bids=Object.entries(v).map(([k,b])=>({_id:k,...b}));renderBlock();renderBoard()});
       ref("sales").on("value",s=>{sales=s.val()||{};renderAll()});
-      ref("players").on("value",s=>{players=s.val()||{};renderChecked()});
+      ref("players").on("value",s=>{players=s.val()||{};renderChecked()},readErr);
     }
     renderAll();
   });
